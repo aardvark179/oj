@@ -30,6 +30,7 @@
 typedef struct _slot {
     struct _slot *    next;
     VALUE             val;
+    VALUE             next_val_slot;
     uint64_t          hash;
     volatile uint32_t use_cnt;
     uint8_t           klen;
@@ -38,6 +39,7 @@ typedef struct _slot {
 
 typedef struct _cache {
     volatile Slot * slots;
+    VALUE slot_array;
     volatile size_t cnt;
     VALUE (*form)(const char *str, size_t len);
     uint64_t size;
@@ -114,14 +116,21 @@ static void rehash(Cache c) {
 
             next    = s->next;
             s->next = *bucket;
+            if (*bucket) {
+              rb_ary_store(s->next_val_slot, 1, (*bucket)->next_val_slot);
+            } else {
+              rb_ary_store(s->next_val_slot, 1, Qnil);
+            }
             *bucket = s;
+            rb_ary_store(c->slot_array, h, s->next_val_slot);
         }
     }
 }
 
 static VALUE lockless_intern(Cache c, const char *key, size_t len) {
     uint64_t       h      = hash_calc((const uint8_t *)key, len);
-    Slot *         bucket = (Slot *)c->slots + (h & c->mask);
+    uint64_t       idx    = (h & c->mask);
+    Slot *         bucket = (Slot *)c->slots + idx;
     Slot           b;
     volatile VALUE rkey;
 
@@ -155,7 +164,16 @@ static VALUE lockless_intern(Cache c, const char *key, size_t len) {
     b->val      = rkey;
     b->use_cnt  = 4;
     b->next     = *bucket;
+    b->next_val_slot = rb_ary_new2(2);
+    rb_ary_store(b->next_val_slot, 0, rkey);
+    if (*bucket) {
+      rb_ary_store(b->next_val_slot, 1, (*bucket)->next_val_slot);
+    } else {
+      rb_ary_store(b->next_val_slot, 1, Qnil);
+    }
     *bucket     = b;
+
+    rb_ary_store(c->slot_array, idx, b->next_val_slot);
     c->cnt++;  // Don't worry about wrapping. Worse case is the entry is removed and recreated.
     if (REHASH_LIMIT < c->cnt / c->size) {
         rehash(c);
@@ -217,6 +235,13 @@ static VALUE locking_intern(Cache c, const char *key, size_t len) {
         bucket = (Slot *)c->slots + (h & c->mask);
     }
     b->next = *bucket;
+    b->next_val_slot = rb_ary_new2(2);
+    rb_ary_store(b->next_val_slot, 0, rkey);
+    if (*bucket) {
+      rb_ary_store(b->next_val_slot, 1, (*bucket)->next_val_slot);
+    } else {
+      rb_ary_store(b->next_val_slot, 1, Qnil);
+    }
     *bucket = b;
     c->cnt++;  // Don't worry about wrapping. Worse case is the entry is removed and recreated.
     if (REHASH_LIMIT < c->cnt / c->size) {
@@ -241,18 +266,23 @@ Cache cache_create(size_t size, VALUE (*form)(const char *str, size_t len), bool
 #else
     c->mutex = rb_mutex_new();
 #endif
-    c->size    = 1 << shift;
-    c->mask    = c->size - 1;
-    c->slots   = calloc(c->size, sizeof(Slot));
-    c->form    = form;
-    c->xrate   = 1;  // low
-    c->mark    = mark;
+    c->size       = 1 << shift;
+    c->mask       = c->size - 1;
+    c->slots      = calloc(c->size, sizeof(Slot));
+    c->slot_array = rb_ary_new2(c->size);
+    c->form       = form;
+    c->xrate      = 1;  // low
+    c->mark       = mark;
     if (locking) {
         c->intern = locking_intern;
     } else {
         c->intern = lockless_intern;
     }
     return c;
+}
+
+void cache_value_store(Cache c, VALUE holder) {
+  rb_iv_set(holder, "cache_store", c->slot_array);
 }
 
 void cache_set_expunge_rate(Cache c, int rate) {

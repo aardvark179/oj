@@ -200,8 +200,6 @@ class CustomJuice < Minitest::Test
   end
 
   def test_deep_nest
-    skip 'TruffleRuby causes SEGV' if RUBY_ENGINE == 'truffleruby'
-
     begin
       n = 10000
       Oj.strict_load('[' * n + ']' * n)
@@ -414,8 +412,6 @@ class CustomJuice < Minitest::Test
   end
 
   def test_date
-    skip 'TruffleRuby causes SEGV' if RUBY_ENGINE == 'truffleruby'
-
     obj = Date.new(2017, 1, 5)
     dump_and_load(obj, false, :create_id => "^o", :create_additions => true)
   end
@@ -445,8 +441,6 @@ class CustomJuice < Minitest::Test
   end
 
   def test_datetime
-    skip 'TruffleRuby causes SEGV' if RUBY_ENGINE == 'truffleruby'
-
     obj = DateTime.new(2017, 1, 5, 10, 20, 30)
     dump_and_load(obj, false, :create_id => "^o", :create_additions => true)
   end

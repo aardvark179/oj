@@ -910,11 +910,11 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
     if (Qundef == rkey && Yes == pi->options.create_ok && NULL != pi->options.create_id &&
         *pi->options.create_id == *key && (int)pi->options.create_id_len == klen &&
         0 == strncmp(pi->options.create_id, key, klen)) {
-        parent->clas = oj_name2class(pi, str, len, false, rb_eArgError);
+      val_set_clas(parent, oj_name2class(pi, str, len, false, rb_eArgError));
         if (2 == klen && '^' == *key && 'o' == key[1]) {
-            if (Qundef != parent->clas) {
-                if (!oj_code_has(codes, parent->clas, false)) {
-                  val_set_value(parent, rb_obj_alloc(parent->clas));
+          if (Qundef != val_get_clas(parent)) {
+            if (!oj_code_has(codes, val_get_clas(parent), false)) {
+              val_set_value(parent, rb_obj_alloc(val_get_clas(parent)));
                 }
             }
         }
@@ -939,7 +939,7 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
         switch (rb_type(val_get_value(parent))) {
         case T_OBJECT: oj_set_obj_ivar(parent, kval, rstr); break;
         case T_HASH:
-            if (4 == parent->klen && NULL != parent->key && rb_cTime == parent->clas &&
+          if (4 == parent->klen && NULL != parent->key && rb_cTime == val_get_clas(parent) &&
                 0 == strncmp("time", parent->key, 4)) {
               if (Qnil == (val_set_value(parent, oj_parse_xml_time(str, (int)len)))) {
                 val_set_value(parent, rb_funcall(rb_cTime, rb_intern("parse"), 1, rb_str_new(str, len)));
@@ -959,15 +959,15 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
 static void end_hash(struct _parseInfo *pi) {
     Val parent = stack_peek(&pi->stack);
 
-    if (Qundef != parent->clas && parent->clas != rb_obj_class(val_get_value(parent))) {
-      volatile VALUE obj = oj_code_load(codes, parent->clas, val_get_value(parent));
+    if (Qundef != val_get_clas(parent) && val_get_clas(parent) != rb_obj_class(val_get_value(parent))) {
+      volatile VALUE obj = oj_code_load(codes, val_get_clas(parent), val_get_value(parent));
 
         if (Qnil != obj) {
           val_set_value(parent, obj);
         } else {
-          val_set_value(parent, rb_funcall(parent->clas, oj_json_create_id, 1, val_get_value(parent)));
+          val_set_value(parent, rb_funcall(val_get_clas(parent), oj_json_create_id, 1, val_get_value(parent)));
         }
-        parent->clas = Qundef;
+        val_set_clas(parent, Qundef);
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_hash_end(pi, __FILE__, __LINE__);
@@ -981,7 +981,7 @@ static void hash_set_num(struct _parseInfo *pi, Val kval, NumInfo ni) {
     switch (rb_type(val_get_value(parent))) {
     case T_OBJECT: oj_set_obj_ivar(parent, kval, rval); break;
     case T_HASH:
-        if (4 == parent->klen && NULL != parent->key && rb_cTime == parent->clas && 0 != ni->div &&
+      if (4 == parent->klen && NULL != parent->key && rb_cTime == val_get_clas(parent) && 0 != ni->div &&
             0 == strncmp("time", parent->key, 4)) {
             int64_t nsec = ni->num * 1000000000LL / ni->div;
 

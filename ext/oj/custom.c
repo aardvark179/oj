@@ -914,7 +914,7 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
         if (2 == klen && '^' == *key && 'o' == key[1]) {
             if (Qundef != parent->clas) {
                 if (!oj_code_has(codes, parent->clas, false)) {
-                    parent->val = rb_obj_alloc(parent->clas);
+                  val_set_value(parent, rb_obj_alloc(parent->clas));
                 }
             }
         }
@@ -936,16 +936,16 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
                 rstr = rb_funcall(clas, oj_json_create_id, 1, rstr);
             }
         }
-        switch (rb_type(parent->val)) {
+        switch (rb_type(val_get_value(parent))) {
         case T_OBJECT: oj_set_obj_ivar(parent, kval, rstr); break;
         case T_HASH:
             if (4 == parent->klen && NULL != parent->key && rb_cTime == parent->clas &&
                 0 == strncmp("time", parent->key, 4)) {
-                if (Qnil == (parent->val = oj_parse_xml_time(str, (int)len))) {
-                    parent->val = rb_funcall(rb_cTime, rb_intern("parse"), 1, rb_str_new(str, len));
+              if (Qnil == (val_set_value(parent, oj_parse_xml_time(str, (int)len)))) {
+                val_set_value(parent, rb_funcall(rb_cTime, rb_intern("parse"), 1, rb_str_new(str, len)));
                 }
             } else {
-                rb_hash_aset(parent->val, rkey, rstr);
+              rb_hash_aset(val_get_value(parent), rkey, rstr);
             }
             break;
         default: break;
@@ -959,13 +959,13 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
 static void end_hash(struct _parseInfo *pi) {
     Val parent = stack_peek(&pi->stack);
 
-    if (Qundef != parent->clas && parent->clas != rb_obj_class(parent->val)) {
-        volatile VALUE obj = oj_code_load(codes, parent->clas, parent->val);
+    if (Qundef != parent->clas && parent->clas != rb_obj_class(val_get_value(parent))) {
+      volatile VALUE obj = oj_code_load(codes, parent->clas, val_get_value(parent));
 
         if (Qnil != obj) {
-            parent->val = obj;
+          val_set_value(parent, obj);
         } else {
-            parent->val = rb_funcall(parent->clas, oj_json_create_id, 1, parent->val);
+          val_set_value(parent, rb_funcall(parent->clas, oj_json_create_id, 1, val_get_value(parent)));
         }
         parent->clas = Qundef;
     }
@@ -978,7 +978,7 @@ static void hash_set_num(struct _parseInfo *pi, Val kval, NumInfo ni) {
     Val            parent = stack_peek(&pi->stack);
     volatile VALUE rval   = oj_num_as_value(ni);
 
-    switch (rb_type(parent->val)) {
+    switch (rb_type(val_get_value(parent))) {
     case T_OBJECT: oj_set_obj_ivar(parent, kval, rval); break;
     case T_HASH:
         if (4 == parent->klen && NULL != parent->key && rb_cTime == parent->clas && 0 != ni->div &&
@@ -993,22 +993,22 @@ static void hash_set_num(struct _parseInfo *pi, Val kval, NumInfo ni) {
                 }
             }
             if (86400 == ni->exp) {  // UTC time
-                parent->val = rb_time_nano_new(ni->i, (long)nsec);
+              val_set_value(parent, rb_time_nano_new(ni->i, (long)nsec));
                 // Since the ruby C routines always create local time, the
                 // offset and then a conversion to UTC keeps makes the time
                 // match the expected value.
-                parent->val = rb_funcall2(parent->val, oj_utc_id, 0, 0);
+              val_set_value(parent, rb_funcall2(val_get_value(parent), oj_utc_id, 0, 0));
             } else if (ni->has_exp) {
                 struct timespec ts;
                 ts.tv_sec   = ni->i;
                 ts.tv_nsec  = nsec;
-                parent->val = rb_time_timespec_new(&ts, ni->exp);
+                val_set_value(parent, rb_time_timespec_new(&ts, ni->exp));
             } else {
-                parent->val = rb_time_nano_new(ni->i, (long)nsec);
+              val_set_value(parent, rb_time_nano_new(ni->i, (long)nsec));
             }
-            rval = parent->val;
+            rval = val_get_value(parent);
         } else {
-            rb_hash_aset(parent->val, oj_calc_hash_key(pi, kval), rval);
+          rb_hash_aset(val_get_value(parent), oj_calc_hash_key(pi, kval), rval);
         }
         break;
     default: break;
@@ -1021,9 +1021,9 @@ static void hash_set_num(struct _parseInfo *pi, Val kval, NumInfo ni) {
 static void hash_set_value(ParseInfo pi, Val kval, VALUE value) {
     Val parent = stack_peek(&pi->stack);
 
-    switch (rb_type(parent->val)) {
+    switch (rb_type(val_get_value(parent))) {
     case T_OBJECT: oj_set_obj_ivar(parent, kval, value); break;
-    case T_HASH: rb_hash_aset(parent->val, oj_calc_hash_key(pi, kval), value); break;
+    case T_HASH: rb_hash_aset(val_get_value(parent), oj_calc_hash_key(pi, kval), value); break;
     default: break;
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
@@ -1035,7 +1035,7 @@ static void array_append_num(ParseInfo pi, NumInfo ni) {
     Val            parent = stack_peek(&pi->stack);
     volatile VALUE rval   = oj_num_as_value(ni);
 
-    rb_ary_push(parent->val, rval);
+    rb_ary_push(val_get_value(parent), rval);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("append_number", pi, __FILE__, __LINE__, rval);
     }
@@ -1048,11 +1048,11 @@ static void array_append_cstr(ParseInfo pi, const char *str, size_t len, const c
         VALUE clas = oj_rxclass_match(&pi->options.str_rx, str, (int)len);
 
         if (Qnil != clas) {
-            rb_ary_push(stack_peek(&pi->stack)->val, rb_funcall(clas, oj_json_create_id, 1, rstr));
+          rb_ary_push(val_get_value(stack_peek(&pi->stack)), rb_funcall(clas, oj_json_create_id, 1, rstr));
             return;
         }
     }
-    rb_ary_push(stack_peek(&pi->stack)->val, rstr);
+    rb_ary_push(val_get_value(stack_peek(&pi->stack)), rstr);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("append_string", pi, __FILE__, __LINE__, rstr);
     }

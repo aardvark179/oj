@@ -22,8 +22,8 @@ static void mark(void *ptr) {
     rb_gc_mark(stack->mutex);
 #endif
     for (v = stack->head; v < stack->tail; v++) {
-        if (Qnil != v->val && Qundef != v->val) {
-            rb_gc_mark(v->val);
+      if (Qnil != val_get_value(v) && Qundef != val_get_value(v)) {
+        rb_gc_mark(val_get_value(v));
         }
         if (Qnil != v->key_val && Qundef != v->key_val) {
             rb_gc_mark(v->key_val);
@@ -60,7 +60,7 @@ oj_stack_init(ValStack stack) {
     stack->head            = stack->base;
     stack->end             = stack->base + sizeof(stack->base) / sizeof(struct _val);
     stack->tail            = stack->head;
-    stack->head->val       = Qundef;
+    stack->head->_val       = Qundef;
     stack->head->key       = NULL;
     stack->head->key_val   = Qundef;
     stack->head->classname = NULL;

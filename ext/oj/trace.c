@@ -54,7 +54,7 @@ void oj_trace_parse_hash_end(ParseInfo pi, const char *file, int line) {
     char  indent[MAX_INDENT];
     int   depth = (int)(stack_size(&pi->stack) * 2 - 2);
     Val   v     = stack_peek(&pi->stack);
-    VALUE obj   = v->val;
+    VALUE obj   = val_get_value(v);
 
     fill_indent(indent, depth);
     sprintf(fmt, "#0:%%13s:%%3d:Oj:{:%%%ds hash_end %%s\n", depth);

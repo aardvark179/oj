@@ -331,7 +331,7 @@ static void add_value(ParseInfo pi, VALUE val) {
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("add_value", pi, __FILE__, __LINE__, val);
     }
-    pi->stack.head->val = val;
+    val_set_value(pi->stack.head, val);
 }
 
 // 123e4567-e89b-12d3-a456-426655440000
@@ -477,9 +477,9 @@ static VALUE cstr_to_rstr(ParseInfo pi, const char *str, size_t len) {
 }
 
 static void add_cstr(ParseInfo pi, const char *str, size_t len, const char *orig) {
-    pi->stack.head->val = cstr_to_rstr(pi, str, len);
+  val_set_value(pi->stack.head, cstr_to_rstr(pi, str, len));
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
-        oj_trace_parse_call("add_string", pi, __FILE__, __LINE__, pi->stack.head->val);
+      oj_trace_parse_call("add_string", pi, __FILE__, __LINE__, val_get_value(pi->stack.head));
     }
 }
 
@@ -487,9 +487,9 @@ static void add_num(ParseInfo pi, NumInfo ni) {
     if (ni->infinity || ni->nan) {
         oj_set_error_at(pi, oj_parse_error_class, __FILE__, __LINE__, "not a number or other value");
     }
-    pi->stack.head->val = oj_num_as_value(ni);
+    val_set_value(pi->stack.head, oj_num_as_value(ni));
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
-        oj_trace_parse_call("add_number", pi, __FILE__, __LINE__, pi->stack.head->val);
+      oj_trace_parse_call("add_number", pi, __FILE__, __LINE__, val_get_value(pi->stack.head));
     }
 }
 
@@ -506,7 +506,7 @@ static VALUE start_hash(ParseInfo pi) {
 static void hash_set_cstr(ParseInfo pi, Val parent, const char *str, size_t len, const char *orig) {
     volatile VALUE rval = cstr_to_rstr(pi, str, len);
 
-    rb_hash_aset(stack_peek(&pi->stack)->val, calc_hash_key(pi, parent), rval);
+    rb_hash_aset(val_get_value(stack_peek(&pi->stack)), calc_hash_key(pi, parent), rval);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("set_string", pi, __FILE__, __LINE__, rval);
     }
@@ -519,14 +519,14 @@ static void hash_set_num(ParseInfo pi, Val parent, NumInfo ni) {
         oj_set_error_at(pi, oj_parse_error_class, __FILE__, __LINE__, "not a number or other value");
     }
     rval = oj_num_as_value(ni);
-    rb_hash_aset(stack_peek(&pi->stack)->val, calc_hash_key(pi, parent), rval);
+    rb_hash_aset(val_get_value(stack_peek(&pi->stack)), calc_hash_key(pi, parent), rval);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("set_number", pi, __FILE__, __LINE__, rval);
     }
 }
 
 static void hash_set_value(ParseInfo pi, Val parent, VALUE value) {
-    rb_hash_aset(stack_peek(&pi->stack)->val, calc_hash_key(pi, parent), value);
+  rb_hash_aset(val_get_value(stack_peek(&pi->stack)), calc_hash_key(pi, parent), value);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("set_value", pi, __FILE__, __LINE__, value);
     }
@@ -542,7 +542,7 @@ static VALUE start_array(ParseInfo pi) {
 static void array_append_cstr(ParseInfo pi, const char *str, size_t len, const char *orig) {
     volatile VALUE rval = cstr_to_rstr(pi, str, len);
 
-    rb_ary_push(stack_peek(&pi->stack)->val, rval);
+    rb_ary_push(val_get_value(stack_peek(&pi->stack)), rval);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("set_value", pi, __FILE__, __LINE__, rval);
     }
@@ -555,14 +555,14 @@ static void array_append_num(ParseInfo pi, NumInfo ni) {
         oj_set_error_at(pi, oj_parse_error_class, __FILE__, __LINE__, "not a number or other value");
     }
     rval = oj_num_as_value(ni);
-    rb_ary_push(stack_peek(&pi->stack)->val, rval);
+    rb_ary_push(val_get_value(stack_peek(&pi->stack)), rval);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("append_number", pi, __FILE__, __LINE__, rval);
     }
 }
 
 static void array_append_value(ParseInfo pi, VALUE value) {
-    rb_ary_push(stack_peek(&pi->stack)->val, value);
+  rb_ary_push(val_get_value(stack_peek(&pi->stack)), value);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("append_value", pi, __FILE__, __LINE__, value);
     }

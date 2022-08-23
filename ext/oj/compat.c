@@ -45,14 +45,14 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
                 rstr = rb_funcall(clas, oj_json_create_id, 1, rstr);
             }
         }
-        if (rb_cHash != rb_obj_class(parent->val)) {
+        if (rb_cHash != rb_obj_class(val_get_value(parent))) {
             // The rb_hash_set would still work but the unit tests for the
             // json gem require the less efficient []= method be called to set
             // values. Even using the store method to set the values will fail
             // the unit tests.
-            rb_funcall(parent->val, rb_intern("[]="), 2, rkey, rstr);
+          rb_funcall(val_get_value(parent), rb_intern("[]="), 2, rkey, rstr);
         } else {
-            rb_hash_aset(parent->val, rkey, rstr);
+          rb_hash_aset(val_get_value(parent), rkey, rstr);
         }
         if (RB_UNLIKELY(Yes == pi->options.trace)) {
             oj_trace_parse_call("set_string", pi, __FILE__, __LINE__, rstr);
@@ -85,7 +85,7 @@ static void end_hash(struct _parseInfo *pi) {
             ID creatable = rb_intern("json_creatable?");
 
             if (!rb_respond_to(clas, creatable) || Qtrue == rb_funcall(clas, creatable, 0)) {
-                parent->val = rb_funcall(clas, oj_json_create_id, 1, parent->val);
+              val_set_value(parent, rb_funcall(clas, oj_json_create_id, 1, val_get_value(parent)));
             }
         }
         if (0 != parent->classname) {
@@ -105,38 +105,38 @@ static void add_cstr(ParseInfo pi, const char *str, size_t len, const char *orig
         VALUE clas = oj_rxclass_match(&pi->options.str_rx, str, (int)len);
 
         if (Qnil != clas) {
-            pi->stack.head->val = rb_funcall(clas, oj_json_create_id, 1, rstr);
+          val_set_value(pi->stack.head, rb_funcall(clas, oj_json_create_id, 1, rstr));
             return;
         }
     }
-    pi->stack.head->val = rstr;
+    val_set_value(pi->stack.head, rstr);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("add_string", pi, __FILE__, __LINE__, rstr);
     }
 }
 
 static void add_num(ParseInfo pi, NumInfo ni) {
-    pi->stack.head->val = oj_num_as_value(ni);
+  val_set_value(pi->stack.head, oj_num_as_value(ni));
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
-        oj_trace_parse_call("add_number", pi, __FILE__, __LINE__, pi->stack.head->val);
+      oj_trace_parse_call("add_number", pi, __FILE__, __LINE__, val_get_value(pi->stack.head));
     }
 }
 
 static void hash_set_num(struct _parseInfo *pi, Val parent, NumInfo ni) {
     volatile VALUE rval = oj_num_as_value(ni);
 
-    if (!oj_use_hash_alt && rb_cHash != rb_obj_class(parent->val)) {
+    if (!oj_use_hash_alt && rb_cHash != rb_obj_class(val_get_value(parent))) {
         // The rb_hash_set would still work but the unit tests for the
         // json gem require the less efficient []= method be called to set
         // values. Even using the store method to set the values will fail
         // the unit tests.
-        rb_funcall(stack_peek(&pi->stack)->val,
+      rb_funcall(val_get_value(stack_peek(&pi->stack)),
                    rb_intern("[]="),
                    2,
                    oj_calc_hash_key(pi, parent),
                    rval);
     } else {
-        rb_hash_aset(stack_peek(&pi->stack)->val, oj_calc_hash_key(pi, parent), rval);
+      rb_hash_aset(val_get_value(stack_peek(&pi->stack)), oj_calc_hash_key(pi, parent), rval);
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("set_number", pi, __FILE__, __LINE__, rval);
@@ -144,18 +144,18 @@ static void hash_set_num(struct _parseInfo *pi, Val parent, NumInfo ni) {
 }
 
 static void hash_set_value(ParseInfo pi, Val parent, VALUE value) {
-    if (rb_cHash != rb_obj_class(parent->val)) {
+  if (rb_cHash != rb_obj_class(val_get_value(parent))) {
         // The rb_hash_set would still work but the unit tests for the
         // json gem require the less efficient []= method be called to set
         // values. Even using the store method to set the values will fail
         // the unit tests.
-        rb_funcall(stack_peek(&pi->stack)->val,
+    rb_funcall(val_get_value(stack_peek(&pi->stack)),
                    rb_intern("[]="),
                    2,
                    oj_calc_hash_key(pi, parent),
                    value);
     } else {
-        rb_hash_aset(stack_peek(&pi->stack)->val, oj_calc_hash_key(pi, parent), value);
+    rb_hash_aset(val_get_value(stack_peek(&pi->stack)), oj_calc_hash_key(pi, parent), value);
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("set_value", pi, __FILE__, __LINE__, value);
@@ -176,13 +176,13 @@ static void array_append_num(ParseInfo pi, NumInfo ni) {
     Val            parent = stack_peek(&pi->stack);
     volatile VALUE rval   = oj_num_as_value(ni);
 
-    if (!oj_use_array_alt && rb_cArray != rb_obj_class(parent->val)) {
+    if (!oj_use_array_alt && rb_cArray != rb_obj_class(val_get_value(parent))) {
         // The rb_ary_push would still work but the unit tests for the json
         // gem require the less efficient << method be called to push the
         // values.
-        rb_funcall(parent->val, rb_intern("<<"), 1, rval);
+      rb_funcall(val_get_value(parent), rb_intern("<<"), 1, rval);
     } else {
-        rb_ary_push(parent->val, rval);
+      rb_ary_push(val_get_value(parent), rval);
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("append_number", pi, __FILE__, __LINE__, rval);
@@ -196,11 +196,11 @@ static void array_append_cstr(ParseInfo pi, const char *str, size_t len, const c
         VALUE clas = oj_rxclass_match(&pi->options.str_rx, str, (int)len);
 
         if (Qnil != clas) {
-            rb_ary_push(stack_peek(&pi->stack)->val, rb_funcall(clas, oj_json_create_id, 1, rstr));
+          rb_ary_push(val_get_value(stack_peek(&pi->stack)), rb_funcall(clas, oj_json_create_id, 1, rstr));
             return;
         }
     }
-    rb_ary_push(stack_peek(&pi->stack)->val, rstr);
+    rb_ary_push(val_get_value(stack_peek(&pi->stack)), rstr);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("append_string", pi, __FILE__, __LINE__, rstr);
     }

@@ -94,7 +94,7 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
     rb_funcall(pi->handler,
                oj_hash_set_id,
                3,
-               stack_peek(&pi->stack)->val,
+               val_get_value(stack_peek(&pi->stack)),
                oj_calc_hash_key(pi, kval),
                rstr);
 }
@@ -103,7 +103,7 @@ static void hash_set_num(ParseInfo pi, Val kval, NumInfo ni) {
     rb_funcall(pi->handler,
                oj_hash_set_id,
                3,
-               stack_peek(&pi->stack)->val,
+               val_get_value(stack_peek(&pi->stack)),
                oj_calc_hash_key(pi, kval),
                oj_num_as_value(ni));
 }
@@ -112,7 +112,7 @@ static void hash_set_value(ParseInfo pi, Val kval, VALUE value) {
     rb_funcall(pi->handler,
                oj_hash_set_id,
                3,
-               stack_peek(&pi->stack)->val,
+               val_get_value(stack_peek(&pi->stack)),
                oj_calc_hash_key(pi, kval),
                value);
 }
@@ -121,15 +121,15 @@ static void array_append_cstr(ParseInfo pi, const char *str, size_t len, const c
     volatile VALUE rstr = rb_str_new(str, len);
 
     rstr = oj_encode(rstr);
-    rb_funcall(pi->handler, oj_array_append_id, 2, stack_peek(&pi->stack)->val, rstr);
+    rb_funcall(pi->handler, oj_array_append_id, 2, val_get_value(stack_peek(&pi->stack)), rstr);
 }
 
 static void array_append_num(ParseInfo pi, NumInfo ni) {
-    rb_funcall(pi->handler, oj_array_append_id, 2, stack_peek(&pi->stack)->val, oj_num_as_value(ni));
+  rb_funcall(pi->handler, oj_array_append_id, 2, val_get_value(stack_peek(&pi->stack)), oj_num_as_value(ni));
 }
 
 static void array_append_value(ParseInfo pi, VALUE value) {
-    rb_funcall(pi->handler, oj_array_append_id, 2, stack_peek(&pi->stack)->val, value);
+  rb_funcall(pi->handler, oj_array_append_id, 2, val_get_value(stack_peek(&pi->stack)), value);
 }
 
 VALUE

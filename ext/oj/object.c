@@ -208,7 +208,7 @@ static int hat_cstr(ParseInfo pi, Val parent, Val kval, const char *str, size_t 
             VALUE clas = oj_name2class(pi, str, len, Yes == pi->options.auto_define, rb_eArgError);
 
             if (Qundef != clas) {
-                parent->val = rb_obj_alloc(clas);
+              val_set_value(parent, rb_obj_alloc(clas));
             }
         } break;
         case 'O':  // odd object
@@ -218,12 +218,12 @@ static int hat_cstr(ParseInfo pi, Val parent, Val kval, const char *str, size_t 
             if (0 == odd) {
                 return 0;
             }
-            parent->val      = odd->clas;
+            val_set_value(parent, odd->clas);
             parent->odd_args = oj_odd_alloc_args(odd);
             break;
         }
-        case 'm': parent->val = ID2SYM(rb_intern3(str + 1, len - 1, oj_utf8_encoding)); break;
-        case 's': parent->val = rb_utf8_str_new(str, len); break;
+        case 'm': val_set_value(parent, ID2SYM(rb_intern3(str + 1, len - 1, oj_utf8_encoding))); break;
+        case 's': val_set_value(parent, rb_utf8_str_new(str, len)); break;
         case 'c':  // class
         {
             VALUE clas = oj_name2class(pi, str, len, Yes == pi->options.auto_define, rb_eArgError);
@@ -231,12 +231,12 @@ static int hat_cstr(ParseInfo pi, Val parent, Val kval, const char *str, size_t 
             if (Qundef == clas) {
                 return 0;
             } else {
-                parent->val = clas;
+              val_set_value(parent, clas);
             }
             break;
         }
         case 't':  // time
-            parent->val = oj_parse_xml_time(str, (int)len);
+          val_set_value(parent, oj_parse_xml_time(str, (int)len));
             break;
         default: return 0; break;
         }
@@ -251,7 +251,6 @@ static int hat_num(ParseInfo pi, Val parent, Val kval, NumInfo ni) {
         case 't':  // time as a float
             if (0 == ni->div || 9 < ni->di) {
                 rb_raise(rb_eArgError, "Invalid time decimal representation.");
-                // parent->val = rb_time_nano_new(0, 0);
             } else {
                 int64_t nsec = ni->num * 1000000000LL / ni->div;
 
@@ -263,27 +262,27 @@ static int hat_num(ParseInfo pi, Val parent, Val kval, NumInfo ni) {
                     }
                 }
                 if (86400 == ni->exp) {  // UTC time
-                    parent->val = rb_time_nano_new(ni->i, (long)nsec);
+                  val_set_value(parent, rb_time_nano_new(ni->i, (long)nsec));
                     // Since the ruby C routines always create local time, the
                     // offset and then a conversion to UTC keeps makes the time
                     // match the expected value.
-                    parent->val = rb_funcall2(parent->val, oj_utc_id, 0, 0);
+                  val_set_value(parent, rb_funcall2(val_get_value(parent), oj_utc_id, 0, 0));
                 } else if (ni->has_exp) {
                     struct timespec ts;
                     ts.tv_sec = ni->i;
                     ts.tv_nsec = nsec;
-                    parent->val = rb_time_timespec_new(&ts, ni->exp);
+                    val_set_value(parent, rb_time_timespec_new(&ts, ni->exp));
                 } else {
-                    parent->val = rb_time_nano_new(ni->i, (long)nsec);
+                  val_set_value(parent, rb_time_nano_new(ni->i, (long)nsec));
                 }
             }
             break;
         case 'i':                                                                                    // circular index
             if (!ni->infinity && !ni->neg && 1 == ni->div && 0 == ni->exp && 0 != pi->circ_array) {  // fixnum
-                if (Qnil == parent->val) {
-                    parent->val = rb_hash_new();
+              if (Qnil == val_get_value(parent)) {
+                val_set_value(parent, rb_hash_new());
                 }
-                oj_circ_array_set(pi->circ_array, parent->val, ni->i);
+              oj_circ_array_set(pi->circ_array, val_get_value(parent), ni->i);
             } else {
                 return 0;
             }
@@ -325,19 +324,19 @@ static int hat_value(ParseInfo pi, Val parent, const char *key, size_t klen, vol
                 sc = oj_name2struct(pi, *RARRAY_PTR(value), rb_eArgError);
             }
             if (sc == rb_cRange) {
-              parent->val = rb_class_new_instance(len - 1, RARRAY_PTR(value) + 1, rb_cRange);
+              val_set_value(parent, rb_class_new_instance(len - 1, RARRAY_PTR(value) + 1, rb_cRange));
             } else {
                 // Create a properly initialized struct instance without calling the initialize method.
-                parent->val = rb_obj_alloc(sc);
+              val_set_value(parent, rb_obj_alloc(sc));
                 // If the JSON array has more entries than the struct class allows, we record an error.
 #ifdef RSTRUCT_LEN
 #if RSTRUCT_LEN_RETURNS_INTEGER_OBJECT
-            slen = (int)NUM2LONG(RSTRUCT_LEN(parent->val));
+              slen = (int)NUM2LONG(RSTRUCT_LEN(val_get_value(parent)));
 #else   // RSTRUCT_LEN_RETURNS_INTEGER_OBJECT
-                slen = (int)RSTRUCT_LEN(parent->val);
+              slen = (int)RSTRUCT_LEN(val_get_value(parent));
 #endif  // RSTRUCT_LEN_RETURNS_INTEGER_OBJECT
 #else
-                slen = FIX2INT(rb_funcall2(parent->val, oj_length_id, 0, 0));
+              slen = FIX2INT(rb_funcall2(val_get_value(parent), oj_length_id, 0, 0));
 #endif
                 // MRI >= 1.9
                 if (len - 1 > slen) {
@@ -346,7 +345,7 @@ static int hat_value(ParseInfo pi, Val parent, const char *key, size_t klen, vol
                     int i;
 
                     for (i = 0; i < len - 1; i++) {
-                        rb_struct_aset(parent->val, INT2FIX(i), RARRAY_PTR(value)[i + 1]);
+                      rb_struct_aset(val_get_value(parent), INT2FIX(i), RARRAY_PTR(value)[i + 1]);
                     }
                 }
             }
@@ -358,9 +357,9 @@ static int hat_value(ParseInfo pi, Val parent, const char *key, size_t klen, vol
                 oj_set_error_at(pi, oj_parse_error_class, __FILE__, __LINE__, "invalid hash pair");
                 return 1;
             }
-            parent->val = rb_hash_new();
+            val_set_value(parent, rb_hash_new());
             a           = RARRAY_PTR(value);
-            rb_hash_aset(parent->val, *a, a[1]);
+            rb_hash_aset(val_get_value(parent), *a, a[1]);
 
             return 1;
         }
@@ -369,12 +368,12 @@ static int hat_value(ParseInfo pi, Val parent, const char *key, size_t klen, vol
 }
 
 void oj_set_obj_ivar(Val parent, Val kval, VALUE value) {
-    if (kval->klen == 5 && strncmp("~mesg", kval->key, 5) == 0 && rb_obj_is_kind_of(parent->val, rb_eException)) {
-        parent->val = rb_funcall(parent->val, rb_intern("exception"), 1, value);
-    } else if (kval->klen == 3 && strncmp("~bt", kval->key, 3) == 0 && rb_obj_is_kind_of(parent->val, rb_eException)) {
-        rb_funcall(parent->val, rb_intern("set_backtrace"), 1, value);
+  if (kval->klen == 5 && strncmp("~mesg", kval->key, 5) == 0 && rb_obj_is_kind_of(val_get_value(parent), rb_eException)) {
+    val_set_value(parent, rb_funcall(val_get_value(parent), rb_intern("exception"), 1, value));
+  } else if (kval->klen == 3 && strncmp("~bt", kval->key, 3) == 0 && rb_obj_is_kind_of(val_get_value(parent), rb_eException)) {
+    rb_funcall(val_get_value(parent), rb_intern("set_backtrace"), 1, value);
     } else {
-        rb_ivar_set(parent->val, oj_attr_intern(kval->key, kval->klen), value);
+    rb_ivar_set(val_get_value(parent), oj_attr_intern(kval->key, kval->klen), value);
     }
 }
 
@@ -385,21 +384,21 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
     volatile VALUE rval   = Qnil;
 
 WHICH_TYPE:
-    switch (rb_type(parent->val)) {
+    switch (rb_type(val_get_value(parent))) {
     case T_NIL:
         parent->odd_args = NULL;  // make sure it is NULL in case not odd
         if ('^' != *key || !hat_cstr(pi, parent, kval, str, len)) {
-            parent->val = rb_hash_new();
+          val_set_value(parent, rb_hash_new());
             goto WHICH_TYPE;
         }
         break;
     case T_HASH:
-        rb_hash_aset(parent->val, calc_hash_key(pi, kval, parent->k1), str_to_value(pi, str, len, orig));
+      rb_hash_aset(val_get_value(parent), calc_hash_key(pi, kval, parent->k1), str_to_value(pi, str, len, orig));
         break;
     case T_STRING:
         rval = str_to_value(pi, str, len, orig);
         if (4 == klen && 's' == *key && 'e' == key[1] && 'l' == key[2] && 'f' == key[3]) {
-            rb_funcall(parent->val, oj_replace_id, 1, rval);
+          rb_funcall(val_get_value(parent), oj_replace_id, 1, rval);
         } else {
             oj_set_obj_ivar(parent, kval, rval);
         }
@@ -415,7 +414,7 @@ WHICH_TYPE:
                             __FILE__,
                             __LINE__,
                             "%s is not an odd class",
-                            rb_class2name(rb_obj_class(parent->val)));
+                            rb_class2name(rb_obj_class(val_get_value(parent))));
             return;
         } else {
             rval = str_to_value(pi, str, len, orig);
@@ -433,7 +432,7 @@ WHICH_TYPE:
                                 __LINE__,
                                 "%s is not an attribute of %s",
                                 buf,
-                                rb_class2name(rb_obj_class(parent->val)));
+                                rb_class2name(rb_obj_class(val_get_value(parent))));
             }
         }
         break;
@@ -443,7 +442,7 @@ WHICH_TYPE:
                         __FILE__,
                         __LINE__,
                         "can not add attributes to a %s",
-                        rb_class2name(rb_obj_class(parent->val)));
+                        rb_class2name(rb_obj_class(val_get_value(parent))));
         return;
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
@@ -458,22 +457,22 @@ static void hash_set_num(ParseInfo pi, Val kval, NumInfo ni) {
     volatile VALUE rval   = Qnil;
 
 WHICH_TYPE:
-    switch (rb_type(parent->val)) {
+    switch (rb_type(val_get_value(parent))) {
     case T_NIL:
         parent->odd_args = NULL;  // make sure it is NULL in case not odd
         if ('^' != *key || !hat_num(pi, parent, kval, ni)) {
-            parent->val = rb_hash_new();
+          val_set_value(parent, rb_hash_new());
             goto WHICH_TYPE;
         }
         break;
     case T_HASH:
         rval = oj_num_as_value(ni);
-        rb_hash_aset(parent->val, calc_hash_key(pi, kval, parent->k1), rval);
+        rb_hash_aset(val_get_value(parent), calc_hash_key(pi, kval, parent->k1), rval);
         break;
     case T_OBJECT:
         if (2 == klen && '^' == *key && 'i' == key[1] && !ni->infinity && !ni->neg && 1 == ni->div && 0 == ni->exp &&
             0 != pi->circ_array) {  // fixnum
-            oj_circ_array_set(pi->circ_array, parent->val, ni->i);
+          oj_circ_array_set(pi->circ_array, val_get_value(parent), ni->i);
         } else {
             rval = oj_num_as_value(ni);
             oj_set_obj_ivar(parent, kval, rval);
@@ -486,7 +485,7 @@ WHICH_TYPE:
                             __FILE__,
                             __LINE__,
                             "%s is not an odd class",
-                            rb_class2name(rb_obj_class(parent->val)));
+                            rb_class2name(rb_obj_class(val_get_value(parent))));
             return;
         } else {
             rval = oj_num_as_value(ni);
@@ -504,7 +503,7 @@ WHICH_TYPE:
                                 __LINE__,
                                 "%s is not an attribute of %s",
                                 buf,
-                                rb_class2name(rb_obj_class(parent->val)));
+                                rb_class2name(rb_obj_class(val_get_value(parent))));
             }
         }
         break;
@@ -514,7 +513,7 @@ WHICH_TYPE:
                         __FILE__,
                         __LINE__,
                         "can not add attributes to a %s",
-                        rb_class2name(rb_obj_class(parent->val)));
+                        rb_class2name(rb_obj_class(val_get_value(parent))));
         return;
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
@@ -528,18 +527,18 @@ static void hash_set_value(ParseInfo pi, Val kval, VALUE value) {
     Val         parent = stack_peek(&pi->stack);
 
 WHICH_TYPE:
-    switch (rb_type(parent->val)) {
+    switch (rb_type(val_get_value(parent))) {
     case T_NIL:
         parent->odd_args = NULL;  // make sure it is NULL in case not odd
         if ('^' != *key || !hat_value(pi, parent, key, klen, value)) {
-            parent->val = rb_hash_new();
+          val_set_value(parent, rb_hash_new());
             goto WHICH_TYPE;
         }
         break;
     case T_HASH:
-        if (rb_cHash != rb_obj_class(parent->val)) {
+      if (rb_cHash != rb_obj_class(val_get_value(parent))) {
             if (4 == klen && 's' == *key && 'e' == key[1] && 'l' == key[2] && 'f' == key[3]) {
-                rb_funcall(parent->val, oj_replace_id, 1, value);
+              rb_funcall(val_get_value(parent), oj_replace_id, 1, value);
             } else {
                 oj_set_obj_ivar(parent, kval, value);
             }
@@ -552,15 +551,15 @@ WHICH_TYPE:
                     oj_set_error_at(pi, oj_parse_error_class, __FILE__, __LINE__, "invalid hash pair");
                     return;
                 }
-                rb_hash_aset(parent->val, *a, a[1]);
+                rb_hash_aset(val_get_value(parent), *a, a[1]);
             } else {
-                rb_hash_aset(parent->val, calc_hash_key(pi, kval, parent->k1), value);
+              rb_hash_aset(val_get_value(parent), calc_hash_key(pi, kval, parent->k1), value);
             }
         }
         break;
     case T_ARRAY:
         if (4 == klen && 's' == *key && 'e' == key[1] && 'l' == key[2] && 'f' == key[3]) {
-            rb_funcall(parent->val, oj_replace_id, 1, value);
+          rb_funcall(val_get_value(parent), oj_replace_id, 1, value);
         } else {
             oj_set_obj_ivar(parent, kval, value);
         }
@@ -575,7 +574,7 @@ WHICH_TYPE:
                             __FILE__,
                             __LINE__,
                             "%s is not an odd class",
-                            rb_class2name(rb_obj_class(parent->val)));
+                            rb_class2name(rb_obj_class(val_get_value(parent))));
             return;
         } else if (0 != oj_odd_set_arg(parent->odd_args, key, klen, value)) {
             char buf[256];
@@ -591,7 +590,7 @@ WHICH_TYPE:
                             __LINE__,
                             "%s is not an attribute of %s",
                             buf,
-                            rb_class2name(rb_obj_class(parent->val)));
+                            rb_class2name(rb_obj_class(val_get_value(parent))));
         }
         break;
     default:
@@ -600,7 +599,7 @@ WHICH_TYPE:
                         __FILE__,
                         __LINE__,
                         "can not add attributes to a %s",
-                        rb_class2name(rb_obj_class(parent->val)));
+                        rb_class2name(rb_obj_class(val_get_value(parent))));
         return;
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
@@ -618,12 +617,12 @@ static VALUE start_hash(ParseInfo pi) {
 static void end_hash(ParseInfo pi) {
     Val parent = stack_peek(&pi->stack);
 
-    if (Qnil == parent->val) {
-        parent->val = rb_hash_new();
+    if (Qnil == val_get_value(parent)) {
+      val_set_value(parent, rb_hash_new());
     } else if (NULL != parent->odd_args) {
         OddArgs oa = parent->odd_args;
 
-        parent->val = rb_funcall2(oa->odd->create_obj, oa->odd->create_op, oa->odd->attr_cnt, oa->args);
+        val_set_value(parent, rb_funcall2(oa->odd->create_obj, oa->odd->create_op, oa->odd->attr_cnt, oa->args));
         oj_odd_free(oa);
         parent->odd_args = NULL;
     }
@@ -636,25 +635,25 @@ static void array_append_cstr(ParseInfo pi, const char *str, size_t len, const c
     volatile VALUE rval = Qnil;
 
     // orig lets us know whether the string was ^r1 or \u005er1
-    if (3 <= len && 0 != pi->circ_array && '^' == orig[0] && 0 == rb_array_len(stack_peek(&pi->stack)->val)) {
+    if (3 <= len && 0 != pi->circ_array && '^' == orig[0] && 0 == rb_array_len(val_get_value(stack_peek(&pi->stack)))) {
         if ('i' == str[1]) {
             long i = read_long(str + 2, len - 2);
 
             if (0 < i) {
-                oj_circ_array_set(pi->circ_array, stack_peek(&pi->stack)->val, i);
+              oj_circ_array_set(pi->circ_array, val_get_value(stack_peek(&pi->stack)), i);
                 return;
             }
         } else if ('r' == str[1]) {
             long i = read_long(str + 2, len - 2);
 
             if (0 < i) {
-                rb_ary_push(stack_peek(&pi->stack)->val, oj_circ_array_get(pi->circ_array, i));
+              rb_ary_push(val_get_value(stack_peek(&pi->stack)), oj_circ_array_get(pi->circ_array, i));
                 return;
             }
         }
     }
     rval = str_to_value(pi, str, len, orig);
-    rb_ary_push(stack_peek(&pi->stack)->val, rval);
+    rb_ary_push(val_get_value(stack_peek(&pi->stack)), rval);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("append_string", pi, __FILE__, __LINE__, rval);
     }
@@ -663,23 +662,23 @@ static void array_append_cstr(ParseInfo pi, const char *str, size_t len, const c
 static void array_append_num(ParseInfo pi, NumInfo ni) {
     volatile VALUE rval = oj_num_as_value(ni);
 
-    rb_ary_push(stack_peek(&pi->stack)->val, rval);
+    rb_ary_push(val_get_value(stack_peek(&pi->stack)), rval);
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_call("append_number", pi, __FILE__, __LINE__, rval);
     }
 }
 
 static void add_cstr(ParseInfo pi, const char *str, size_t len, const char *orig) {
-    pi->stack.head->val = str_to_value(pi, str, len, orig);
+  val_set_value(pi->stack.head, str_to_value(pi, str, len, orig));
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
-        oj_trace_parse_call("add_string", pi, __FILE__, __LINE__, pi->stack.head->val);
+      oj_trace_parse_call("add_string", pi, __FILE__, __LINE__, val_get_value(pi->stack.head));
     }
 }
 
 static void add_num(ParseInfo pi, NumInfo ni) {
-    pi->stack.head->val = oj_num_as_value(ni);
+  val_set_value(pi->stack.head, oj_num_as_value(ni));
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
-        oj_trace_parse_call("add_num", pi, __FILE__, __LINE__, pi->stack.head->val);
+      oj_trace_parse_call("add_num", pi, __FILE__, __LINE__, val_get_value(pi->stack.head));
     }
 }
 

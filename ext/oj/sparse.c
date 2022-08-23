@@ -630,7 +630,7 @@ static void array_end(ParseInfo pi) {
                         oj_stack_next_string(array->next));
     } else {
         pi->end_array(pi);
-        add_value(pi, array->val);
+        add_value(pi, val_get_value(array));
     }
 }
 
@@ -656,7 +656,7 @@ static void hash_end(ParseInfo pi) {
     } else {
         pi->end_hash(pi);
         stack_pop(&pi->stack);
-        add_value(pi, hash->val);
+        add_value(pi, val_get_value(hash));
     }
 }
 
@@ -904,7 +904,7 @@ oj_pi_sparse(int argc, VALUE *argv, ParseInfo pi, int fd) {
     // value stack (while it is in scope).
     wrapped_stack = oj_stack_init(&pi->stack);
     rb_protect(protect_parse, (VALUE)pi, &line);
-    if (Qundef == pi->stack.head->val && !empty_ok(&pi->options)) {
+    if (Qundef == val_get_value(pi->stack.head) && !empty_ok(&pi->options)) {
         oj_set_error_at(pi, oj_parse_error_class, __FILE__, __LINE__, "Empty input");
     }
     result                  = stack_head_val(&pi->stack);

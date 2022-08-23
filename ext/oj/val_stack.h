@@ -27,7 +27,7 @@ typedef enum {
 } ValNext;
 
 typedef struct _val {
-    volatile VALUE val;
+    volatile VALUE _val;
     const char *   key;
     char           karray[32];
     volatile VALUE key_val;
@@ -95,7 +95,7 @@ inline static void stack_push(ValStack stack, VALUE val, ValNext next) {
         rb_mutex_unlock(stack->mutex);
 #endif
     }
-    stack->tail->val       = val;
+    stack->tail->_val       = val;
     stack->tail->next      = next;
     stack->tail->classname = NULL;
     stack->tail->clas      = Qundef;
@@ -131,8 +131,8 @@ inline static Val stack_prev(ValStack stack) {
 }
 
 inline static VALUE stack_head_val(ValStack stack) {
-    if (Qundef != stack->head->val) {
-        return stack->head->val;
+    if (Qundef != stack->head->_val) {
+        return stack->head->_val;
     }
     return Qnil;
 }
@@ -143,6 +143,30 @@ inline static Val stack_pop(ValStack stack) {
         return stack->tail;
     }
     return 0;
+}
+
+inline static VALUE val_get_value(Val val) {
+  return val->_val;
+}
+
+inline static VALUE val_get_key_value(Val val) {
+  return val->key_val;
+}
+
+inline static VALUE val_get_clas(Val val) {
+  return val->clas;
+}
+
+inline static VALUE val_set_value(Val val, VALUE v) {
+  return val->_val = v;
+}
+
+inline static VALUE val_set_key_value(Val val, VALUE v) {
+  return val->key_val = v;
+}
+
+inline static VALUE val_set_clas(Val val, VALUE v) {
+  return val->clas = v;
 }
 
 extern const char *oj_stack_next_string(ValNext n);

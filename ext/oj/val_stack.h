@@ -30,7 +30,7 @@ typedef struct _val {
     volatile VALUE _val;
     const char *   key;
     char           karray[32];
-    volatile VALUE key_val;
+    volatile VALUE _key_val;
     const char *   classname;
     VALUE          clas;
     OddArgs        odd_args;
@@ -101,7 +101,7 @@ inline static void stack_push(ValStack stack, VALUE val, ValNext next) {
     stack->tail->clas      = Qundef;
     stack->tail->odd_args  = NULL;
     stack->tail->key       = 0;
-    stack->tail->key_val   = Qundef;
+    stack->tail->_key_val   = Qundef;
     stack->tail->clen      = 0;
     stack->tail->klen      = 0;
     stack->tail->kalloc    = 0;
@@ -150,7 +150,7 @@ inline static VALUE val_get_value(Val val) {
 }
 
 inline static VALUE val_get_key_value(Val val) {
-  return val->key_val;
+  return val->_key_val;
 }
 
 inline static VALUE val_get_clas(Val val) {
@@ -162,7 +162,7 @@ inline static VALUE val_set_value(Val val, VALUE v) {
 }
 
 inline static VALUE val_set_key_value(Val val, VALUE v) {
-  return val->key_val = v;
+  return val->_key_val = v;
 }
 
 inline static VALUE val_set_clas(Val val, VALUE v) {

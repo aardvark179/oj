@@ -289,7 +289,7 @@ void oj_dump_wab_val(VALUE obj, int depth, Out out) {
 ///// load functions /////
 
 static VALUE calc_hash_key(ParseInfo pi, Val parent) {
-    volatile VALUE rkey = parent->key_val;
+  volatile VALUE rkey = val_get_key_value(parent);
 
     if (Qundef != rkey) {
         rkey = oj_encode(rkey);

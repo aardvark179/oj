@@ -25,8 +25,8 @@ static void mark(void *ptr) {
       if (Qnil != val_get_value(v) && Qundef != val_get_value(v)) {
         rb_gc_mark(val_get_value(v));
         }
-        if (Qnil != v->key_val && Qundef != v->key_val) {
-            rb_gc_mark(v->key_val);
+      if (Qnil != val_get_key_value(v) && Qundef != val_get_key_value(v)) {
+        rb_gc_mark(val_get_key_value(v));
         }
         if (NULL != v->odd_args) {
             VALUE *a;
@@ -62,7 +62,7 @@ oj_stack_init(ValStack stack) {
     stack->tail            = stack->head;
     stack->head->_val       = Qundef;
     stack->head->key       = NULL;
-    stack->head->key_val   = Qundef;
+    stack->head->_key_val   = Qundef;
     stack->head->classname = NULL;
     stack->head->odd_args  = NULL;
     stack->head->clas      = Qundef;

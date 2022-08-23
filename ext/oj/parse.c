@@ -328,7 +328,7 @@ static void read_escaped_str(ParseInfo pi, const char *start) {
             break;
         case NEXT_HASH_NEW:
         case NEXT_HASH_KEY:
-            if (Qundef == (parent->key_val = pi->hash_key(pi, buf.head, buf_len(&buf)))) {
+          if (Qundef == (val_set_key_value(parent, pi->hash_key(pi, buf.head, buf_len(&buf))))) {
                 parent->klen = buf_len(&buf);
                 parent->key  = malloc(parent->klen + 1);
                 memcpy((char *)parent->key, buf.head, parent->klen);
@@ -400,7 +400,7 @@ static void read_str(ParseInfo pi) {
             break;
         case NEXT_HASH_NEW:
         case NEXT_HASH_KEY:
-            if (Qundef == (parent->key_val = pi->hash_key(pi, str, pi->cur - str))) {
+          if (Qundef == (val_set_key_value(parent, pi->hash_key(pi, str, pi->cur - str)))) {
                 parent->key  = str;
                 parent->klen = pi->cur - str;
             } else {

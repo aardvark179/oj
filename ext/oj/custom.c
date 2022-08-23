@@ -905,7 +905,7 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
     const char    *key    = kval->key;
     int            klen   = kval->klen;
     Val            parent = stack_peek(&pi->stack);
-    volatile VALUE rkey   = kval->key_val;
+    volatile VALUE rkey   = val_get_key_value(kval);
 
     if (Qundef == rkey && Yes == pi->options.create_ok && NULL != pi->options.create_id &&
         *pi->options.create_id == *key && (int)pi->options.create_id_len == klen &&

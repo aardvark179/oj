@@ -26,7 +26,7 @@ VALUE oj_cstr_to_value(const char *str, size_t len, size_t cache_str) {
 }
 
 VALUE oj_calc_hash_key(ParseInfo pi, Val parent) {
-    volatile VALUE rkey = parent->key_val;
+  volatile VALUE rkey = val_get_key_value(parent);
 
     if (Qundef != rkey) {
         return rkey;

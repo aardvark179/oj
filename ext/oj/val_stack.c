@@ -19,15 +19,8 @@ static void mark(void *ptr) {
     pthread_mutex_lock(&stack->mutex);
 #else
     rb_mutex_lock(stack->mutex);
-    rb_gc_mark(stack->mutex);
 #endif
     for (v = stack->head; v < stack->tail; v++) {
-      if (Qnil != val_get_value(v) && Qundef != val_get_value(v)) {
-        rb_gc_mark(val_get_value(v));
-        }
-      if (Qnil != val_get_key_value(v) && Qundef != val_get_key_value(v)) {
-        rb_gc_mark(val_get_key_value(v));
-        }
         if (NULL != v->odd_args) {
             VALUE *a;
             int    i;
@@ -48,6 +41,7 @@ static void mark(void *ptr) {
 
 VALUE
 oj_stack_init(ValStack stack) {
+    VALUE chain_ary = rb_ary_new2(4);
 #ifdef HAVE_PTHREAD_MUTEX_INIT
     int err;
 
@@ -55,11 +49,13 @@ oj_stack_init(ValStack stack) {
         rb_raise(rb_eException, "failed to initialize a mutex. %s", strerror(err));
     }
 #else
-    stack->mutex = rb_mutex_new();
+    VALUE mutex = rb_mutex_new()
+    stack->mutex = mutex;
 #endif
     stack->head            = stack->base;
     stack->end             = stack->base + sizeof(stack->base) / sizeof(struct _val);
     stack->tail            = stack->head;
+    stack->head->_chain_ary = chain_ary;
     stack->head->_val       = Qundef;
     stack->head->key       = NULL;
     stack->head->_key_val   = Qundef;
@@ -70,7 +66,12 @@ oj_stack_init(ValStack stack) {
     stack->head->clen      = 0;
     stack->head->next      = NEXT_NONE;
 
-    return Data_Wrap_Struct(oj_cstack_class, mark, 0, stack);
+    VALUE res = Data_Wrap_Struct(oj_cstack_class, mark, 0, stack);
+    rb_iv_set(res, "stack_chain", chain_ary);
+#ifndef HAVE_PTHREAD_MUTEX_INIT
+    rb_iv_set(res, "stack_mutex", mutex);
+#endif
+    return res;
 }
 
 const char *oj_stack_next_string(ValNext n) {

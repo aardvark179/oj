@@ -33,6 +33,7 @@ typedef struct _val {
     volatile VALUE _key_val;
     const char *   classname;
     VALUE          _clas;
+    VALUE          _chain_ary;
     OddArgs        odd_args;
     uint16_t       klen;
     uint16_t       clen;
@@ -68,6 +69,7 @@ inline static void stack_cleanup(ValStack stack) {
 }
 
 inline static void stack_push(ValStack stack, VALUE val, ValNext next) {
+    VALUE chain_ary = rb_ary_new2(4);
     if (stack->end <= stack->tail) {
         size_t len  = stack->end - stack->head;
         size_t toff = stack->tail - stack->head;
@@ -94,6 +96,10 @@ inline static void stack_push(ValStack stack, VALUE val, ValNext next) {
 #else
         rb_mutex_unlock(stack->mutex);
 #endif
+    }
+    if (stack->head < stack->tail) {
+      rb_ary_store(stack->head->_chain_ary, 0, chain_ary);
+      stack->tail->_chain_ary = chain_ary;
     }
     stack->tail->_val       = val;
     stack->tail->next      = next;
@@ -158,14 +164,17 @@ inline static VALUE val_get_clas(Val val) {
 }
 
 inline static VALUE val_set_value(Val val, VALUE v) {
+  rb_ary_store(val->_chain_ary, 1, v == Qundef ? Qnil : v);
   return val->_val = v;
 }
 
 inline static VALUE val_set_key_value(Val val, VALUE v) {
+  rb_ary_store(val->_chain_ary, 2, v == Qundef ? Qnil : v);
   return val->_key_val = v;
 }
 
 inline static VALUE val_set_clas(Val val, VALUE v) {
+  rb_ary_store(val->_chain_ary, 3, v == Qundef ? Qnil : v);
   return val->_clas = v;
 }
 

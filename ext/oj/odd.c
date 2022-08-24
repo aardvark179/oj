@@ -4,6 +4,7 @@
 #include "odd.h"
 
 #include <string.h>
+#include "val_stack.h"
 
 static Odd odds = NULL;
 static VALUE odd_chain_root = Qundef;
@@ -180,15 +181,14 @@ Odd oj_get_oddc(const char *classname, size_t len) {
     return NULL;
 }
 
-OddArgs oj_odd_alloc_args(Odd odd) {
+OddArgs oj_odd_alloc_args(Val val, Odd odd) {
     OddArgs oa = ALLOC_N(struct _oddArgs, 1);
-    VALUE  *a;
-    int     i;
+    VALUE args = rb_ary_new2(MAX_ODD_ARGS);
+    oa->_args = args;
 
     oa->odd = odd;
-    for (i = odd->attr_cnt, a = ODD_ARGS_PTR(oa); 0 < i; i--, a++) {
-        *a = Qnil;
-    }
+    val->_odd_args = oa;
+    rb_ary_store(val->_chain_ary, 4, args);
     return oa;
 }
 

@@ -34,7 +34,7 @@ typedef struct _val {
     const char *   classname;
     VALUE          _clas;
     VALUE          _chain_ary;
-    OddArgs        odd_args;
+    OddArgs        _odd_args;
     uint16_t       klen;
     uint16_t       clen;
     char           next;  // ValNext
@@ -69,7 +69,7 @@ inline static void stack_cleanup(ValStack stack) {
 }
 
 inline static void stack_push(ValStack stack, VALUE val, ValNext next) {
-    VALUE chain_ary = rb_ary_new2(4);
+  VALUE chain_ary = rb_ary_new2(5);
     if (stack->end <= stack->tail) {
         size_t len  = stack->end - stack->head;
         size_t toff = stack->tail - stack->head;
@@ -105,7 +105,7 @@ inline static void stack_push(ValStack stack, VALUE val, ValNext next) {
     stack->tail->next      = next;
     stack->tail->classname = NULL;
     stack->tail->_clas      = Qundef;
-    stack->tail->odd_args  = NULL;
+    stack->tail->_odd_args  = NULL;
     stack->tail->key       = 0;
     stack->tail->_key_val   = Qundef;
     stack->tail->clen      = 0;
@@ -163,6 +163,15 @@ inline static VALUE val_get_clas(Val val) {
   return val->_clas;
 }
 
+inline static OddArgs val_get_odd_args(Val val) {
+  return val->_odd_args;
+}
+
+inline static OddArgs val_clear_odd_args(Val val) {
+  rb_ary_store(val->_chain_ary, 4, Qnil);
+  return val->_odd_args = NULL;
+}
+
 inline static VALUE val_set_value(Val val, VALUE v) {
   rb_ary_store(val->_chain_ary, 1, v == Qundef ? Qnil : v);
   return val->_val = v;
@@ -179,5 +188,8 @@ inline static VALUE val_set_clas(Val val, VALUE v) {
 }
 
 extern const char *oj_stack_next_string(ValNext n);
+
+// We declare this here to resolve a circular dependencies between the stack and odd headers.
+extern OddArgs oj_odd_alloc_args(Val val, Odd odd);
 
 #endif /* OJ_VAL_STACK_H */

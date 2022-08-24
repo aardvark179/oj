@@ -8,40 +8,9 @@
 #include "odd.h"
 #include "oj.h"
 
-static void mark(void *ptr) {
-    ValStack stack = (ValStack)ptr;
-    Val      v;
-
-    if (NULL == ptr) {
-        return;
-    }
-#ifdef HAVE_PTHREAD_MUTEX_INIT
-    pthread_mutex_lock(&stack->mutex);
-#else
-    rb_mutex_lock(stack->mutex);
-#endif
-    for (v = stack->head; v < stack->tail; v++) {
-        if (NULL != v->odd_args) {
-            VALUE *a;
-            int    i;
-
-            for (i = v->odd_args->odd->attr_cnt, a = ODD_ARGS_PTR(v->odd_args); 0 < i; i--, a++) {
-                if (Qnil != *a) {
-                    rb_gc_mark(*a);
-                }
-            }
-        }
-    }
-#ifdef HAVE_PTHREAD_MUTEX_INIT
-    pthread_mutex_unlock(&stack->mutex);
-#else
-    rb_mutex_unlock(stack->mutex);
-#endif
-}
-
 VALUE
 oj_stack_init(ValStack stack) {
-    VALUE chain_ary = rb_ary_new2(4);
+    VALUE chain_ary = rb_ary_new2(5);
 #ifdef HAVE_PTHREAD_MUTEX_INIT
     int err;
 
@@ -60,13 +29,13 @@ oj_stack_init(ValStack stack) {
     stack->head->key       = NULL;
     stack->head->_key_val   = Qundef;
     stack->head->classname = NULL;
-    stack->head->odd_args  = NULL;
+    stack->head->_odd_args  = NULL;
     stack->head->_clas      = Qundef;
     stack->head->klen      = 0;
     stack->head->clen      = 0;
     stack->head->next      = NEXT_NONE;
 
-    VALUE res = Data_Wrap_Struct(oj_cstack_class, mark, 0, stack);
+    VALUE res = Data_Wrap_Struct(oj_cstack_class, 0, 0, stack);
     rb_iv_set(res, "stack_chain", chain_ary);
 #ifndef HAVE_PTHREAD_MUTEX_INIT
     rb_iv_set(res, "stack_mutex", mutex);

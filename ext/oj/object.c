@@ -219,7 +219,7 @@ static int hat_cstr(ParseInfo pi, Val parent, Val kval, const char *str, size_t 
                 return 0;
             }
             val_set_value(parent, ODD_GET_CLASS(odd));
-            parent->odd_args = oj_odd_alloc_args(odd);
+            oj_odd_alloc_args(parent, odd);
             break;
         }
         case 'm': val_set_value(parent, ID2SYM(rb_intern3(str + 1, len - 1, oj_utf8_encoding))); break;
@@ -386,7 +386,7 @@ static void hash_set_cstr(ParseInfo pi, Val kval, const char *str, size_t len, c
 WHICH_TYPE:
     switch (rb_type(val_get_value(parent))) {
     case T_NIL:
-        parent->odd_args = NULL;  // make sure it is NULL in case not odd
+        val_clear_odd_args(parent);  // make sure it is NULL in case not odd
         if ('^' != *key || !hat_cstr(pi, parent, kval, str, len)) {
           val_set_value(parent, rb_hash_new());
             goto WHICH_TYPE;
@@ -408,7 +408,7 @@ WHICH_TYPE:
         oj_set_obj_ivar(parent, kval, rval);
         break;
     case T_CLASS:
-        if (NULL == parent->odd_args) {
+      if (NULL == val_get_odd_args(parent)) {
             oj_set_error_at(pi,
                             oj_parse_error_class,
                             __FILE__,
@@ -418,7 +418,7 @@ WHICH_TYPE:
             return;
         } else {
             rval = str_to_value(pi, str, len, orig);
-            if (0 != oj_odd_set_arg(parent->odd_args, kval->key, kval->klen, rval)) {
+            if (0 != oj_odd_set_arg(val_get_odd_args(parent), kval->key, kval->klen, rval)) {
                 char buf[256];
 
                 if ((int)sizeof(buf) - 1 <= klen) {
@@ -459,7 +459,7 @@ static void hash_set_num(ParseInfo pi, Val kval, NumInfo ni) {
 WHICH_TYPE:
     switch (rb_type(val_get_value(parent))) {
     case T_NIL:
-        parent->odd_args = NULL;  // make sure it is NULL in case not odd
+      val_clear_odd_args(parent);  // make sure it is NULL in case not odd
         if ('^' != *key || !hat_num(pi, parent, kval, ni)) {
           val_set_value(parent, rb_hash_new());
             goto WHICH_TYPE;
@@ -479,7 +479,7 @@ WHICH_TYPE:
         }
         break;
     case T_CLASS:
-        if (NULL == parent->odd_args) {
+      if (NULL == val_get_odd_args(parent)) {
             oj_set_error_at(pi,
                             oj_parse_error_class,
                             __FILE__,
@@ -489,7 +489,7 @@ WHICH_TYPE:
             return;
         } else {
             rval = oj_num_as_value(ni);
-            if (0 != oj_odd_set_arg(parent->odd_args, key, klen, rval)) {
+            if (0 != oj_odd_set_arg(val_get_odd_args(parent), key, klen, rval)) {
                 char buf[256];
 
                 if ((int)sizeof(buf) - 1 <= klen) {
@@ -529,7 +529,7 @@ static void hash_set_value(ParseInfo pi, Val kval, VALUE value) {
 WHICH_TYPE:
     switch (rb_type(val_get_value(parent))) {
     case T_NIL:
-        parent->odd_args = NULL;  // make sure it is NULL in case not odd
+      val_clear_odd_args(parent);  // make sure it is NULL in case not odd
         if ('^' != *key || !hat_value(pi, parent, key, klen, value)) {
           val_set_value(parent, rb_hash_new());
             goto WHICH_TYPE;
@@ -568,7 +568,7 @@ WHICH_TYPE:
     case T_OBJECT: oj_set_obj_ivar(parent, kval, value); break;
     case T_MODULE:
     case T_CLASS:
-        if (NULL == parent->odd_args) {
+      if (NULL == val_get_odd_args(parent)) {
             oj_set_error_at(pi,
                             oj_parse_error_class,
                             __FILE__,
@@ -576,7 +576,7 @@ WHICH_TYPE:
                             "%s is not an odd class",
                             rb_class2name(rb_obj_class(val_get_value(parent))));
             return;
-        } else if (0 != oj_odd_set_arg(parent->odd_args, key, klen, value)) {
+      } else if (0 != oj_odd_set_arg(val_get_odd_args(parent), key, klen, value)) {
             char buf[256];
 
             if ((int)sizeof(buf) - 1 <= klen) {
@@ -619,12 +619,12 @@ static void end_hash(ParseInfo pi) {
 
     if (Qnil == val_get_value(parent)) {
       val_set_value(parent, rb_hash_new());
-    } else if (NULL != parent->odd_args) {
-        OddArgs oa = parent->odd_args;
+    } else if (NULL != val_get_odd_args(parent)) {
+        OddArgs oa = val_get_odd_args(parent);
 
         val_set_value(parent, rb_funcall2(ODD_GET_CREATE_OBJ(oa->odd), oa->odd->create_op, oa->odd->attr_cnt, ODD_ARGS_PTR(oa)));
         oj_odd_free(oa);
-        parent->odd_args = NULL;
+        val_clear_odd_args(parent);
     }
     if (RB_UNLIKELY(Yes == pi->options.trace)) {
         oj_trace_parse_hash_end(pi, __FILE__, __LINE__);

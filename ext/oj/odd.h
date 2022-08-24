@@ -30,10 +30,10 @@ typedef struct _odd {
 
 typedef struct _oddArgs {
     Odd   odd;
-    VALUE _args[MAX_ODD_ARGS];
+    VALUE _args;
 } * OddArgs;
 
-#define ODD_ARGS_PTR(odd) odd->_args
+#define ODD_ARGS_PTR(odd) RARRAY_PTR(odd->_args)
 #define ODD_GET_CLASS(odd) odd->_clas
 #define ODD_GET_CREATE_OBJ(odd) odd->_create_obj
 #define ODD_SET_CLASS(odd, clas) (odd_set_class(odd, clas))
@@ -52,7 +52,6 @@ static inline VALUE odd_set_create_obj(Odd odd, VALUE create_obj) {
 extern void    oj_odd_init(void);
 extern Odd     oj_get_odd(VALUE clas);
 extern Odd     oj_get_oddc(const char *classname, size_t len);
-extern OddArgs oj_odd_alloc_args(Odd odd);
 extern void    oj_odd_free(OddArgs args);
 extern int     oj_odd_set_arg(OddArgs args, const char *key, size_t klen, VALUE value);
 extern void    oj_reg_odd(VALUE clas, VALUE create_object, VALUE create_method, int mcnt, VALUE *members, bool raw);

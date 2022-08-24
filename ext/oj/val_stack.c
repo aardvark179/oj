@@ -25,7 +25,7 @@ static void mark(void *ptr) {
             VALUE *a;
             int    i;
 
-            for (i = v->odd_args->odd->attr_cnt, a = v->odd_args->args; 0 < i; i--, a++) {
+            for (i = v->odd_args->odd->attr_cnt, a = ODD_ARGS_PTR(v->odd_args); 0 < i; i--, a++) {
                 if (Qnil != *a) {
                     rb_gc_mark(*a);
                 }

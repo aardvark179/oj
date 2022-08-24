@@ -218,7 +218,7 @@ static int hat_cstr(ParseInfo pi, Val parent, Val kval, const char *str, size_t 
             if (0 == odd) {
                 return 0;
             }
-            val_set_value(parent, odd->clas);
+            val_set_value(parent, ODD_GET_CLASS(odd));
             parent->odd_args = oj_odd_alloc_args(odd);
             break;
         }
@@ -622,7 +622,7 @@ static void end_hash(ParseInfo pi) {
     } else if (NULL != parent->odd_args) {
         OddArgs oa = parent->odd_args;
 
-        val_set_value(parent, rb_funcall2(oa->odd->create_obj, oa->odd->create_op, oa->odd->attr_cnt, oa->args));
+        val_set_value(parent, rb_funcall2(ODD_GET_CREATE_OBJ(oa->odd), oa->odd->create_op, oa->odd->attr_cnt, ODD_ARGS_PTR(oa)));
         oj_odd_free(oa);
         parent->odd_args = NULL;
     }

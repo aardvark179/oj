@@ -6,6 +6,7 @@
 #include <string.h>
 
 static Odd odds = NULL;
+static VALUE odd_chain_root = Qundef;
 static ID  sec_id;
 static ID  sec_fraction_id;
 static ID  to_f_id;
@@ -19,12 +20,10 @@ static void set_class(Odd odd, const char *classname) {
 
     odd->classname = classname;
     odd->clen      = strlen(classname);
-    odd->clas      = rb_const_get(rb_cObject, rb_intern(classname));
-    rb_gc_register_mark_object(odd->clas);
-    odd->create_obj = odd->clas;
-    rb_gc_register_mark_object(odd->create_obj);
+    ODD_SET_CLASS(odd, rb_const_get(rb_cObject, rb_intern(classname)));
+    ODD_SET_CREATE_OBJ(odd, ODD_GET_CLASS(odd));
     odd->create_op = rb_intern("new");
-    odd->is_module = (T_MODULE == rb_type(odd->clas));
+    odd->is_module = (T_MODULE == rb_type(ODD_GET_CLASS(odd)));
     odd->raw       = 0;
     for (np = odd->attr_names, idp = odd->attrs; 0 != *np; np++, idp++) {
         *idp = rb_intern(*np);
@@ -69,9 +68,16 @@ void print_all_odds(const char *label) {
 
 static Odd odd_create(void) {
     Odd odd = ALLOC(struct _odd);
+    VALUE odd_chain = rb_ary_new2(3);
 
     memset(odd, 0, sizeof(struct _odd));
+    odd->_odd_chain = odd_chain;
     odd->next = odds;
+    // Build up the chain that will preserve all the VALUEs.
+    if (odds) {
+      rb_ary_store(odd->_odd_chain, 2, odds->_odd_chain);
+    }
+    rb_ary_store(odd_chain_root, 0, odd->_odd_chain);
     odds      = odd;
 
     return odd;
@@ -88,6 +94,9 @@ void oj_odd_init(void) {
     denominator_id  = rb_intern("denominator");
     rational_id     = rb_intern("Rational");
 
+    odd_chain_root = rb_ary_new();
+    rb_gc_register_address(&odd_chain_root);
+
     // Rational
     odd   = odd_create();
     np    = odd->attr_names;
@@ -95,7 +104,7 @@ void oj_odd_init(void) {
     *np++ = "denominator";
     *np   = 0;
     set_class(odd, "Rational");
-    odd->create_obj = rb_cObject;
+    ODD_SET_CREATE_OBJ(odd, rb_cObject);
     odd->create_op  = rational_id;
     odd->attr_cnt   = 2;
 
@@ -142,7 +151,7 @@ Odd oj_get_odd(VALUE clas) {
     const char *classname = NULL;
 
     for (odd = odds; NULL != odd; odd = odd->next) {
-        if (clas == odd->clas) {
+      if (clas == ODD_GET_CLASS(odd)) {
             return odd;
         }
         if (odd->is_module) {
@@ -177,7 +186,7 @@ OddArgs oj_odd_alloc_args(Odd odd) {
     int     i;
 
     oa->odd = odd;
-    for (i = odd->attr_cnt, a = oa->args; 0 < i; i--, a++) {
+    for (i = odd->attr_cnt, a = ODD_ARGS_PTR(oa); 0 < i; i--, a++) {
         *a = Qnil;
     }
     return oa;
@@ -192,7 +201,7 @@ int oj_odd_set_arg(OddArgs args, const char *key, size_t klen, VALUE value) {
     VALUE       *vp;
     int          i;
 
-    for (i = args->odd->attr_cnt, np = args->odd->attr_names, vp = args->args; 0 < i; i--, np++, vp++) {
+    for (i = args->odd->attr_cnt, np = args->odd->attr_names, vp = ODD_ARGS_PTR(args); 0 < i; i--, np++, vp++) {
         if (0 == strncmp(key, *np, klen) && '\0' == *((*np) + klen)) {
             *vp = value;
             return 0;
@@ -208,14 +217,12 @@ void oj_reg_odd(VALUE clas, VALUE create_object, VALUE create_method, int mcnt, 
     AttrGetFunc *fp;
 
     odd       = odd_create();
-    odd->clas = clas;
-    rb_gc_register_mark_object(odd->clas);
+    ODD_SET_CLASS(odd, clas);
     if (NULL == (odd->classname = strdup(rb_class2name(clas)))) {
         rb_raise(rb_eNoMemError, "for class name.");
     }
     odd->clen       = strlen(odd->classname);
-    odd->create_obj = create_object;
-    rb_gc_register_mark_object(odd->create_obj);
+    ODD_SET_CREATE_OBJ(odd,  create_object);
     odd->create_op = SYM2ID(create_method);
     odd->attr_cnt  = mcnt;
     odd->is_module = (T_MODULE == rb_type(clas));

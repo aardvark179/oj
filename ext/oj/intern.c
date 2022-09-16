@@ -92,14 +92,17 @@ void oj_hash_init(void) {
 
     struct _cache *str_cache     = cache_create(0, form_str, true, true);
     str_cache_obj = Data_Wrap_Struct(cache_class, cache_mark, cache_free, str_cache);
+    cache_value_store(str_cache, str_cache_obj);
     rb_gc_register_address(&str_cache_obj);
 
     struct _cache *sym_cache     = cache_create(0, form_sym, true, true);
     sym_cache_obj = Data_Wrap_Struct(cache_class, cache_mark, cache_free, sym_cache);
+    cache_value_store(sym_cache, sym_cache_obj);
     rb_gc_register_address(&sym_cache_obj);
 
     struct _cache *attr_cache = cache_create(0, form_attr, false, true);
     attr_cache_obj = Data_Wrap_Struct(cache_class, cache_mark, cache_free, attr_cache);
+    cache_value_store(attr_cache, attr_cache_obj);
     rb_gc_register_address(&attr_cache_obj);
 
     memset(class_hash.slots, 0, sizeof(class_hash.slots));

@@ -27,13 +27,10 @@ typedef enum {
 } ValNext;
 
 typedef struct _val {
-    volatile VALUE _val;
+    int _depth;
     const char *   key;
     char           karray[32];
-    volatile VALUE _key_val;
     const char *   classname;
-    VALUE          _clas;
-    VALUE          _chain_ary;
     OddArgs        _odd_args;
     uint16_t       klen;
     uint16_t       clen;
@@ -68,51 +65,27 @@ inline static void stack_cleanup(ValStack stack) {
     }
 }
 
-inline static void stack_push(ValStack stack, VALUE val, ValNext next) {
-  VALUE chain_ary = rb_ary_new2(5);
-    if (stack->end <= stack->tail) {
-        size_t len  = stack->end - stack->head;
-        size_t toff = stack->tail - stack->head;
-        Val    head = stack->head;
+extern void stack_push(ValStack stack, VALUE val, ValNext next);
 
-        // A realloc can trigger a GC so make sure it happens outside the lock
-        // but lock before changing pointers.
-        if (stack->base == stack->head) {
-            head = ALLOC_N(struct _val, len + STACK_INC);
-            memcpy(head, stack->base, sizeof(struct _val) * len);
-        } else {
-            REALLOC_N(head, struct _val, len + STACK_INC);
-        }
-#ifdef HAVE_PTHREAD_MUTEX_INIT
-        pthread_mutex_lock(&stack->mutex);
-#else
-        rb_mutex_lock(stack->mutex);
-#endif
-        stack->head = head;
-        stack->tail = stack->head + toff;
-        stack->end  = stack->head + len + STACK_INC;
-#ifdef HAVE_PTHREAD_MUTEX_INIT
-        pthread_mutex_unlock(&stack->mutex);
-#else
-        rb_mutex_unlock(stack->mutex);
-#endif
-    }
-    if (stack->head < stack->tail) {
-      rb_ary_store(stack->head->_chain_ary, 0, chain_ary);
-      stack->tail->_chain_ary = chain_ary;
-    }
-    stack->tail->_val       = val;
-    stack->tail->next      = next;
-    stack->tail->classname = NULL;
-    stack->tail->_clas      = Qundef;
-    stack->tail->_odd_args  = NULL;
-    stack->tail->key       = 0;
-    stack->tail->_key_val   = Qundef;
-    stack->tail->clen      = 0;
-    stack->tail->klen      = 0;
-    stack->tail->kalloc    = 0;
-    stack->tail++;
+extern void stack_pop(ValStack stack);
+
+extern VALUE val_get_value(Val val);
+
+extern VALUE val_get_key_value(Val val);
+
+extern VALUE val_get_clas(Val val);
+
+inline static OddArgs val_get_odd_args(Val val) {
+  return val->_odd_args;
 }
+
+extern OddArgs val_clear_odd_args(Val val);
+
+extern VALUE val_set_value(Val val, VALUE v);
+
+extern VALUE val_set_key_value(Val val, VALUE v);
+
+extern VALUE val_set_clas(Val val, VALUE v);
 
 inline static size_t stack_size(ValStack stack) {
     return stack->tail - stack->head;
@@ -137,54 +110,11 @@ inline static Val stack_prev(ValStack stack) {
 }
 
 inline static VALUE stack_head_val(ValStack stack) {
-    if (Qundef != stack->head->_val) {
-        return stack->head->_val;
-    }
-    return Qnil;
+  return val_get_value(stack->head);
 }
 
-inline static Val stack_pop(ValStack stack) {
-    if (stack->head < stack->tail) {
-        stack->tail--;
-        return stack->tail;
-    }
-    return 0;
-}
-
-inline static VALUE val_get_value(Val val) {
-  return val->_val;
-}
-
-inline static VALUE val_get_key_value(Val val) {
-  return val->_key_val;
-}
-
-inline static VALUE val_get_clas(Val val) {
-  return val->_clas;
-}
-
-inline static OddArgs val_get_odd_args(Val val) {
-  return val->_odd_args;
-}
-
-inline static OddArgs val_clear_odd_args(Val val) {
-  rb_ary_store(val->_chain_ary, 4, Qnil);
-  return val->_odd_args = NULL;
-}
-
-inline static VALUE val_set_value(Val val, VALUE v) {
-  rb_ary_store(val->_chain_ary, 1, v == Qundef ? Qnil : v);
-  return val->_val = v;
-}
-
-inline static VALUE val_set_key_value(Val val, VALUE v) {
-  rb_ary_store(val->_chain_ary, 2, v == Qundef ? Qnil : v);
-  return val->_key_val = v;
-}
-
-inline static VALUE val_set_clas(Val val, VALUE v) {
-  rb_ary_store(val->_chain_ary, 3, v == Qundef ? Qnil : v);
-  return val->_clas = v;
+static inline int val_stack_depth(ValStack stack) {
+  return stack->tail - stack->head;
 }
 
 extern const char *oj_stack_next_string(ValNext n);

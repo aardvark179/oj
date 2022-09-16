@@ -637,20 +637,25 @@ static void array_start(ParseInfo pi) {
 }
 
 static void array_end(ParseInfo pi) {
-    Val array = stack_pop(&pi->stack);
+    Val array = stack_peek(&pi->stack);
 
     if (0 == array) {
         oj_set_error_at(pi, oj_parse_error_class, __FILE__, __LINE__, "unexpected array close");
+        stack_pop(&pi->stack);
     } else if (NEXT_ARRAY_COMMA != array->next && NEXT_ARRAY_NEW != array->next) {
+        const char *next_cstr = oj_stack_next_string(array->next);
+        stack_pop(&pi->stack);
         oj_set_error_at(pi,
                         oj_parse_error_class,
                         __FILE__,
                         __LINE__,
                         "expected %s, not an array close",
-                        oj_stack_next_string(array->next));
+                        next_cstr);
     } else {
+        VALUE value = val_get_value(array);
+        stack_pop(&pi->stack);
         pi->end_array(pi);
-        add_value(pi, val_get_value(array));
+        add_value(pi, value);
     }
 }
 
